@@ -1,7 +1,7 @@
 import requests
 
 Api_Key = '417f9a49541c40a3b0ee53db1737c6d9'
-URL = 'https://twelvedata.com/markets {417f9a49541c40a3b0ee53db1737c6d9}'
+URL = 'https://twelvedata.com/markets'
 
 def obtener_precio_accion(simbolo):
 
