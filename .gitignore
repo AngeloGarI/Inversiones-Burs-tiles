@@ -1,8 +1,11 @@
+# Ignorar entorno virtual
 venv/
+# Ignorar archivos de configuración privados
 .env
-__pycache__/
+# Ignorar cachés
+_pycache_/
 *.pyc
+# Ignorar credenciales de AWS
 aws/
 aws/config/
 aws/credentials/
-persona3.py/
