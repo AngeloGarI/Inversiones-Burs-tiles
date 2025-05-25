@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from app.AWSConnections import AWSConnections
 from app.stock_api import getCurrentPrice
 
-# Lista editable de acciones disponibles
+
 ACCIONES_DISPONIBLES = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
 
 load_dotenv()
@@ -31,7 +31,7 @@ def registrar_usuario():
     nuevo = {
         'email': email,
         'Nombre': nombre,
-        'Saldo': Decimal('1000'),
+        'Saldo': Decimal('15000'),
         'Portafolio': {},
         'Inversiones ': []
     }
