@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 from app.AWSConnections import AWSConnections
 from app.stock_api import getCurrentPrice
 
+# Lista editable de acciones disponibles
+ACCIONES_DISPONIBLES = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+
 load_dotenv()
 os.environ["AWS_SHARED_CREDENTIALS_FILE"] = os.getenv("AWS_SHARED_CREDENTIALS_FILE")
 os.environ["AWS_CONFIG_FILE"] = os.getenv("AWS_CONFIG_FILE")
@@ -20,12 +23,11 @@ def registrar_usuario():
     print("\n--- Registro de Usuario ---")
     email = input("Correo electrónico: ").strip()
     nombre = input("Nombre: ").strip()
-    # Verificar si ya existe
     respuesta = tabla.get_item(Key={'email': email})
     if 'Item' in respuesta:
         print("Ya existe un usuario con ese correo.")
         return None
-    
+
     nuevo = {
         'email': email,
         'Nombre': nombre,
@@ -52,11 +54,16 @@ def consultar_accion():
     simbolo = input("Ingrese símbolo de acción (ej. AAPL, MSFT): ").strip().upper()
     precio = getCurrentPrice(simbolo)
     if precio:
-        print(f"Precio actual de {simbolo}: ${precio:.2f}")
+        print(f"Precio actual de {simbolo}: Q{precio:.2f}")
 
 def invertir(usuario):
+    print("\nSímbolos disponibles para invertir:", ', '.join(ACCIONES_DISPONIBLES))
     simbolo = input("Símbolo de la acción: ").strip().upper()
-    cantidad = int(input("Cantidad a invertir (en dólares): "))
+    if simbolo not in ACCIONES_DISPONIBLES:
+        print("Símbolo no disponible. Intente con uno de la lista.")
+        return
+
+    cantidad = int(input("Cantidad a invertir (en Quetzales): "))
     precio = getCurrentPrice(simbolo)
     if precio is None:
         print("No se pudo obtener el precio.")
@@ -65,16 +72,16 @@ def invertir(usuario):
         print("Saldo insuficiente.")
         return
     acciones_compradas = round(cantidad / precio, 4)
-    
+
     portafolio = usuario.get('Portafolio', {})
     if simbolo in portafolio:
         portafolio[simbolo] += Decimal(str(acciones_compradas))
     else:
         portafolio[simbolo] = Decimal(str(acciones_compradas))
     usuario['Portafolio'] = portafolio
-    
+
     usuario['Saldo'] -= Decimal(str(cantidad))
-    
+
     usuario['Inversiones '].append({
         'simbolo': simbolo,
         'precio': Decimal(str(precio)),
@@ -82,25 +89,53 @@ def invertir(usuario):
         'acciones': Decimal(str(acciones_compradas)),
         'fecha': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     })
-    # Guardar en tabla
+
     tabla.put_item(Item=usuario)
-    print(f"Inversión realizada: {acciones_compradas} acciones de {simbolo} a ${precio:.2f}")
+    print(f"Inversión realizada: {acciones_compradas} acciones de {simbolo} a Q{precio:.2f}")
 
 def mostrar_portafolio(usuario):
     print("\n--- Portafolio ---")
     portafolio = usuario.get('Portafolio', {})
+    inversiones = usuario.get('Inversiones ', [])
+
     if not portafolio:
         print("No hay acciones en el portafolio.")
+        return
+
+    resumen = {}
+    for inv in inversiones:
+        simbolo = inv['simbolo']
+        if simbolo not in resumen:
+            resumen[simbolo] = {'total_invertido': Decimal('0'), 'acciones': Decimal('0')}
+        resumen[simbolo]['total_invertido'] += Decimal(str(inv['cantidad']))
+        resumen[simbolo]['acciones'] += Decimal(str(inv['acciones']))
+
     for simbolo, cantidad in portafolio.items():
-        print(f"{simbolo}: {cantidad} acciones")
+        precio_actual = getCurrentPrice(simbolo)
+        if precio_actual is None:
+            print(f"{simbolo}: Error al obtener precio actual.")
+            continue
+
+        acciones = resumen[simbolo]['acciones']
+        invertido = resumen[simbolo]['total_invertido']
+        precio_promedio = invertido / acciones if acciones > 0 else Decimal('0')
+        valor_actual = precio_actual * float(cantidad)
+        ganancia = valor_actual - float(invertido)
+
+        print(f"{simbolo}:")
+        print(f"  Acciones: {cantidad}")
+        print(f"  Precio Promedio Compra: Q{precio_promedio:.2f}")
+        print(f"  Precio Actual: Q{precio_actual:.2f}")
+        print(f"  Valor Actual: Q{valor_actual:.2f}")
+        print(f"  Ganancia/Pérdida: Q{ganancia:.2f}")
 
 def consultar_saldo(usuario):
-    print(f"Saldo actual: ${usuario['Saldo']}")
+    print(f"Saldo actual: Q{usuario['Saldo']}")
 
 def resumen_inversiones(usuario):
     print("\n--- Resumen de Inversiones ---")
     for inv in usuario.get('Inversiones ', []):
-        print(f"{inv['fecha']} - {inv['simbolo']}: ${inv['cantidad']} por {inv['acciones']} acciones a ${inv['precio']}")
+        print(f"{inv['fecha']} - {inv['simbolo']}: Q{inv['cantidad']} por {inv['acciones']} acciones a Q{inv['precio']}")
 
 def menu_usuario(usuario):
     while True:
