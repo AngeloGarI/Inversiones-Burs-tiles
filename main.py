@@ -1,150 +1,157 @@
-import uuid
-import boto3
-from botocore.exceptions import ClientError
+import os
+import sys
+import json
+from decimal import Decimal
 from datetime import datetime
+from dotenv import load_dotenv
+from app.AWSConnections import AWSConnections
+from app.stock_api import getCurrentPrice
 
-# Configuración DynamoDB
-dynamodb = boto3.resource('dynamodb', region_name='us-east-1')  # Cambia región de Aws si es us-east-1 o us-east-2
+load_dotenv()
+os.environ["AWS_SHARED_CREDENTIALS_FILE"] = os.getenv("AWS_SHARED_CREDENTIALS_FILE")
+os.environ["AWS_CONFIG_FILE"] = os.getenv("AWS_CONFIG_FILE")
+os.environ["AWS_PROFILE"] = os.getenv("AWS_PROFILE")
 
-#  Funciones de DynamoDB (Persona 5) agregada
+aws = AWSConnections()
+dynamodb = aws.getSession().resource('dynamodb')
+tabla = dynamodb.Table('Usuarios')
 
-def guardar_usuario(usuario):
-    try:
-        tabla = dynamodb.Table('Usuarios')
-        tabla.put_item(Item=usuario)
-    except ClientError as e:
-        print("Error al guardar usuario:", e)
-
-def obtener_usuario(user_id):
-    try:
-        tabla = dynamodb.Table('Usuarios')
-        response = tabla.get_item(Key={'user_id': user_id})
-        return response.get('Item', None)
-    except ClientError as e:
-        print("Error al obtener usuario:", e)
+def registrar_usuario():
+    print("\n--- Registro de Usuario ---")
+    email = input("Correo electrónico: ").strip()
+    nombre = input("Nombre: ").strip()
+    # Verificar si ya existe
+    respuesta = tabla.get_item(Key={'email': email})
+    if 'Item' in respuesta:
+        print("Ya existe un usuario con ese correo.")
         return None
-
-def guardar_inversion(inversion):
-    try:
-        tabla = dynamodb.Table('Inversiones')
-        tabla.put_item(Item=inversion)
-    except ClientError as e:
-        print("Error al guardar inversión:", e)
-
-def obtener_inversiones(user_id):
-    try:
-        tabla = dynamodb.Table('Inversiones')
-        response = tabla.scan(
-            FilterExpression=boto3.dynamodb.conditions.Attr('user_id').eq(user_id)
-        )
-        return response.get('Items', [])
-    except ClientError as e:
-        print("Error al obtener inversiones:", e)
-        return []
-
-# Menú
-
-def mostrar_menu():
-    print("\n Sistema de Inversiones Bursátiles ")
-    print("1. Crear usuario")
-    print("2. Consultar acciones disponibles")
-    print("3. Invertir en acciones")
-    print("4. Ver portafolio")
-    print("5. Consultar saldo y resumen")
-    print("6. Mostrar reporte general")
-    print("7. Salir")
-
-def ejecutar_menu():
-    while True:
-        mostrar_menu()
-        opcion = input("Seleccione una opción (1-7): ").strip()
-        
-        if opcion == "1":
-            crear_usuario()
-        elif opcion == "2":
-            consultar_acciones()
-        elif opcion == "3":
-            invertir_en_acciones()
-        elif opcion == "4":
-            ver_portafolio()
-        elif opcion == "5":
-            consultar_saldo_y_resumen()
-        elif opcion == "6":
-            mostrar_reporte_general()
-        elif opcion == "7":
-            print("Gracias por usar el sistema. ¡Hasta luego!")
-            break
-        else:
-            print("Opción no válida. Intente de nuevo.")
-
-# --- Funciones a implementar por otras personas (marcadas para completar) ---
-
-def crear_usuario():
-    # Aquí implementa Persona 2, aquí un ejemplo básico con integración a DynamoDB
-    nombre = input("Ingrese nombre de usuario: ").strip()
-    if not nombre:
-        print("El nombre no puede estar vacío.")
-        return
-    correo = input("Ingrese correo electrónico (opcional): ").strip()
-    user_id = str(uuid.uuid4())
-    saldo_inicial = 1000.0  # saldo virtual inicial fijo
     
-    # Validar que usuario no exista (simplificado)
-    # Idealmente, buscar en DynamoDB por correo osea lo que dijo el inge para evitar duplicados
-    # Aquí omitido para simplificar
-
-    usuario = {
-        'user_id': user_id,
-        'nombre': nombre,
-        'correo': correo,
-        'saldo': saldo_inicial
+    nuevo = {
+        'email': email,
+        'Nombre': nombre,
+        'Saldo': Decimal('1000'),
+        'Portafolio': {},
+        'Inversiones ': []
     }
-    guardar_usuario(usuario)
-    print(f"Usuario creado con ID: {user_id} y saldo inicial de Q{saldo_inicial:.2f}")
+    tabla.put_item(Item=nuevo)
+    print("Usuario registrado con éxito.")
+    return nuevo
 
-def consultar_acciones():
-    print("Función consultar_acciones A implementar...")
-    # La persona 3 implementa esto
-
-def invertir_en_acciones():
-    print("Función invertir_en_acciones A implementar...")
-    # La persona 4 implementa esto
-
-def ver_portafolio():
-    print("Función ver_portafolio A implementar...")
-    # La persona 4 implementa esto
-
-def consultar_saldo_y_resumen():
-    user_id = input("Ingrese su ID de usuario: ").strip()
-    usuario = obtener_usuario(user_id)
-    if usuario:
-        print(f"\nNombre: {usuario.get('nombre')}")
-        print(f"Correo: {usuario.get('correo')}")
-        print(f"Saldo actual: Q{usuario.get('saldo', 0):.2f}")
-        
-        inversiones = obtener_inversiones(user_id)
-        if inversiones:
-            total_invertido = sum(float(inv['amount']) for inv in inversiones)
-            print(f"Total invertido: Q{total_invertido:.2f}")
-            print(f"Cantidad de inversiones: {len(inversiones)}")
-        else:
-            print("No se encontraron inversiones registradas.")
+def iniciar_sesion():
+    print("\n--- Iniciar Sesión ---")
+    email = input("Correo electrónico: ").strip()
+    respuesta = tabla.get_item(Key={'email': email})
+    if 'Item' in respuesta:
+        print(f"Bienvenido {respuesta['Item']['Nombre']}")
+        return respuesta['Item']
     else:
         print("Usuario no encontrado.")
+        return None
 
-def mostrar_reporte_general():
-    print("\n Reporte General del Sistema ")
-    tabla = dynamodb.Table('Usuarios')
-    try:
-        response = tabla.scan()
-        usuarios = response.get('Items', [])
-        print(f"Total de usuarios registrados: {len(usuarios)}")
-        for u in usuarios:
-            print(f"- {u['nombre']} ({u['user_id']}) - Saldo: Q{u.get('saldo', 0):.2f}")
-    except ClientError as e:
-        print("Error al consultar usuarios:", e)
+def consultar_accion():
+    simbolo = input("Ingrese símbolo de acción (ej. AAPL, MSFT): ").strip().upper()
+    precio = getCurrentPrice(simbolo)
+    if precio:
+        print(f"Precio actual de {simbolo}: ${precio:.2f}")
 
-# Punto de entrada del programa 
+def invertir(usuario):
+    simbolo = input("Símbolo de la acción: ").strip().upper()
+    cantidad = int(input("Cantidad a invertir (en dólares): "))
+    precio = getCurrentPrice(simbolo)
+    if precio is None:
+        print("No se pudo obtener el precio.")
+        return
+    if usuario['Saldo'] < cantidad:
+        print("Saldo insuficiente.")
+        return
+    acciones_compradas = round(cantidad / precio, 4)
+    
+    portafolio = usuario.get('Portafolio', {})
+    if simbolo in portafolio:
+        portafolio[simbolo] += Decimal(str(acciones_compradas))
+    else:
+        portafolio[simbolo] = Decimal(str(acciones_compradas))
+    usuario['Portafolio'] = portafolio
+    
+    usuario['Saldo'] -= Decimal(str(cantidad))
+    
+    usuario['Inversiones '].append({
+        'simbolo': simbolo,
+        'precio': Decimal(str(precio)),
+        'cantidad': Decimal(str(cantidad)),
+        'acciones': Decimal(str(acciones_compradas)),
+        'fecha': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    })
+    # Guardar en tabla
+    tabla.put_item(Item=usuario)
+    print(f"Inversión realizada: {acciones_compradas} acciones de {simbolo} a ${precio:.2f}")
 
-if __name__ == "__main__":
-    ejecutar_menu()
+def mostrar_portafolio(usuario):
+    print("\n--- Portafolio ---")
+    portafolio = usuario.get('Portafolio', {})
+    if not portafolio:
+        print("No hay acciones en el portafolio.")
+    for simbolo, cantidad in portafolio.items():
+        print(f"{simbolo}: {cantidad} acciones")
+
+def consultar_saldo(usuario):
+    print(f"Saldo actual: ${usuario['Saldo']}")
+
+def resumen_inversiones(usuario):
+    print("\n--- Resumen de Inversiones ---")
+    for inv in usuario.get('Inversiones ', []):
+        print(f"{inv['fecha']} - {inv['simbolo']}: ${inv['cantidad']} por {inv['acciones']} acciones a ${inv['precio']}")
+
+def menu_usuario(usuario):
+    while True:
+        print("""
+\n--- MENÚ PRINCIPAL ---
+1. Consultar acciones disponibles
+2. Invertir en acciones
+3. Ver portafolio
+4. Consultar saldo
+5. Ver resumen de inversiones
+6. Salir
+""")
+        op = input("Seleccione una opción: ")
+        if op == '1':
+            consultar_accion()
+        elif op == '2':
+            invertir(usuario)
+        elif op == '3':
+            mostrar_portafolio(usuario)
+        elif op == '4':
+            consultar_saldo(usuario)
+        elif op == '5':
+            resumen_inversiones(usuario)
+        elif op == '6':
+            print("Sesión finalizada.")
+            break
+        else:
+            print("Opción inválida.")
+
+def menu_inicio():
+    while True:
+        print("""
+--- MENÚ DE INICIO ---
+1. Iniciar sesión
+2. Registrarse
+3. Salir
+""")
+        op = input("Seleccione una opción: ")
+        if op == '1':
+            user = iniciar_sesion()
+            if user:
+                menu_usuario(user)
+        elif op == '2':
+            user = registrar_usuario()
+            if user:
+                menu_usuario(user)
+        elif op == '3':
+            print("Gracias por usar el sistema.")
+            break
+        else:
+            print("Opción inválida.")
+
+if __name__ == '__main__':
+    menu_inicio()
