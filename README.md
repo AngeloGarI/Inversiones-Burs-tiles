@@ -48,7 +48,7 @@ Inversiones/
 │   ├── AWSConnections.py
 │   └── stock_api.py
 |── Colaboradore/
-│   ├── api.py
+│   ├── api.py, Registro(Andres)
 │   └── perona4.py , Menú_e_integracion_con_base_de_datos_
 ├── main.py
 ├── requirements.txt
